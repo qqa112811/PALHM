@@ -1,0 +1,65 @@
+{
+	"execs": [
+		{
+			"id": "tar",
+			"argv": [
+				"/bin/tar",
+				"--xattrs",
+				"--selinux",
+				"--warning=none",
+				"-cf",
+				"-"
+			],
+			"ec": "<2"
+		},
+		{
+			"id": "filter-xz-parallel",
+			"argv": [ "/bin/xz", "-T0" ]
+		},
+		{
+			"id": "filter-gzip-plain",
+			"argv": [ "/bin/gzip" ]
+		},
+		{
+			"id": "filter-zstd-plain",
+			"argv": [ "/bin/zstd" ]
+		},
+		{
+			"id": "filter-zstd-parallel",
+			"argv": [ "/bin/zstd", "-T0" ]
+		},
+		{
+			"id": "rpm-list-installed",
+			"argv": [
+				"/bin/rpm",
+				"-qa",
+				"--qf",
+				"%{name}\\t%{version}-%{release}.%{arch}\\t%{vendor}\\n"
+			]
+		},
+		{
+			"id": "dpkg-list-installed",
+			"argv": [ "/bin/dpkg-query", "-l" ]
+		},
+		{
+			"id": "lsblk-all-json",
+			"argv": [ "/bin/lsblk", "-JbOa" ]
+		},
+		{
+			"id": "os-release",
+			"argv": [ "/bin/cat", "/etc/os-release" ]
+		},
+		{
+			"id": "dig-dnssec",
+			"argv": [ "/bin/dig", "+short", "+dnssec", "+notcp" ]
+		},
+		{
+			"id": "grep-any",
+			"argv": [ "/bin/grep", "." ]
+		},
+		{
+			"id": "null-stdout-sink",
+			"argv": [ "/bin/cp", "/dev/stdin", "/dev/null" ]
+		}
+	]
+}

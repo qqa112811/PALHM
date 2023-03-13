@@ -1,0 +1,12 @@
+[Unit]
+Description=PALHM send boot report mail
+After=postfix.service sendmail.service exim.service dovecot.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/var/lib/PALHM/src/palhm.py -q boot-report
+Nice=10
+User=palhm
+
+[Install]
+WantedBy=multi-user.target

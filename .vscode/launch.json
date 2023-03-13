@@ -1,0 +1,63 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "palhm config",
+			"type": "python",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "src/palhm.py",
+			"args": [ "-f", "src/conf/py-debug/palhm.jsonc", "config" ],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
+			"name": "palhm mods",
+			"type": "python",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "src/palhm.py",
+			"args": [ "mods" ],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
+			"name": "palhm boot-report",
+			"type": "python",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "src/palhm.py",
+			"args": [ "-f", "src/conf/py-debug/palhm.jsonc", "boot-report" ],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
+			"name": "palhm run default",
+			"type": "python",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "src/palhm.py",
+			"args": [ "-f", "src/conf/py-debug/palhm.jsonc", "run" ],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
+			"name": "palhm run check-dnssec",
+			"type": "python",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "src/palhm.py",
+			"args": [
+				"-f",
+				"src/conf/py-debug/palhm.jsonc",
+				"run",
+				"check-dnssec"
+			],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		}
+	]
+}

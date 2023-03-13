@@ -1,0 +1,163 @@
+// PALHM Instance Config
+{
+	"include": [ "conf.d/core.json" ],
+	"modules": [ "aws" ],
+	"nb-workers": 0, // assumed $(nproc) - default
+	// "nb-workers": 1, // to disable concurrent task despatch
+	// To unlimit the number of workers.
+	// Does not fail on resource alloc failure.
+	// "nb-workers": -1,
+	"vl": 4,
+	"tasks": [
+		{
+			"id": "backup",
+			"type": "backup",
+			"backend": "aws-s3",
+			"backend-param": {
+				// "profile": "default",
+				"bucket": "palhm.test",
+				"root": "/palhm/backup",
+				"prefix": {
+					"type": "default"
+					// "type": "iso8601",
+					// "timespec": "seconds",
+					// "tz": "utc"
+				},
+				// "sink-storage-class": "STANDARD_IA",
+				// "rot-storage-class": "ONEZONE_IA",
+				"nb-copy-limit": 2, // or Infinity assumed(not in JSON spec)
+				"root-size-limit": "Infinity" // or Infinity assumed
+			},
+			"object-groups": [
+				{ "id": "pre-start" },
+				{
+					"id": "data-dump",
+					"depends": [ "pre-start" ]
+				},
+				{
+					"id": "tar-media-0",
+					"depends": [ "data-dump" ]
+				},
+				{
+					"id": "tar-media-1",
+					"depends": [ "data-dump" ]
+				}
+			],
+			"objects": [
+				{
+					"path": "pm-list.gz",
+					"group": "pre-start",
+					"pipeline": [
+						{ "type": "exec", "exec-id": "rpm-list-installed" },
+						{ "type": "exec", "exec-id": "filter-gzip-plain" }
+					]
+				},
+				{
+					"path": "lsblk.json.gz",
+					"group": "pre-start",
+					"pipeline": [
+						{
+							"type": "exec-append",
+							"exec-id": "lsblk-all-json",
+							"argv": [ "-a" ]
+						},
+						{ "type": "exec", "exec-id": "filter-gzip-plain" }
+					]
+				},
+				{
+					"path": "random-dump.sql.xz",
+					"alloc-size": 2097152,
+					"group": "data-dump",
+					"pipeline": [
+						{
+							"type": "exec-inline",
+							"argv": [
+								"/bin/dd",
+								"if=/dev/urandom",
+								"bs=4096",
+								"count=512",
+								"status=none"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-xz-parallel" }
+					]
+				},
+				{
+					"path": "random-dump.0.xz",
+					"alloc-size": 2097152,
+					"group": "tar-media-0",
+					"pipeline": [
+						{
+							"type": "exec-inline",
+							"argv": [
+								"/bin/dd",
+								"if=/dev/zero",
+								"bs=4096",
+								"count=512",
+								"status=none"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-xz-parallel" }
+					]
+				},
+				{
+					"path": "random-dump.1.xz",
+					"alloc-size": 2097152,
+					"group": "tar-media-1",
+					"pipeline": [
+						{
+							"type": "exec-inline",
+							"argv": [
+								"/bin/dd",
+								"if=/dev/zero",
+								"bs=4096",
+								"count=512",
+								"status=none"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-xz-parallel" }
+					]
+				}
+			]
+		},
+		{
+			"id": "update",
+			"type": "routine",
+			"routine": [
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/echo", "0" ]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/sleep", "1" ]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/echo", "1" ]
+				}
+			]
+		},
+		{
+			"id": "default",
+			"type": "routine",
+			"routine": [
+				{ "type": "task", "task-id": "backup" },
+				{ "type": "task", "task-id": "update" },
+				{
+					// Block SIGTERM from systemd/init.d so the program is not
+					// affected by the reboot command.
+					"type": "builtin",
+					"builtin-id": "sigmask",
+					"param": [
+						{ "action": "block", "sig": [ "TERM" ] }
+					]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/true" ]
+				}
+			]
+		}
+	]
+}

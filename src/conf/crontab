@@ -1,0 +1,6 @@
+# PALHM will produce stderr on exception. Mail the output to root
+MAILTO="root"
+# Run default task every Sunday at midnight
+0  0  *  *  sun root /var/lib/PALHM/src/palhm.py -q run
+# Check dnssec validity every hour
+# 0  *  *  *  *   root systemd-run -qP -p User=palhm -p Nice=15 -p ProtectSystem=strict -p ReadOnlyPaths=/ -p PrivateDevices=true --wait /var/lib/PALHM/src/palhm.py -q run check-dnssec

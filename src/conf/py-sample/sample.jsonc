@@ -1,0 +1,170 @@
+{
+	"include": [ "/etc/palhm/conf.d/core.json" ],
+	"modules": [ "aws" ],
+	"nb-workers": 0,
+	// "vl": 4,
+	"boot-report": {
+		// "mua": "stdout",
+		"mua": "mailx",
+		// "mua": "aws-sns",
+		"mua-param": {
+			"int-opts": [ "smtp=localhost" ]
+		},
+		"mail-to": [ "root" ],
+		// "subject": "Custom Boot Report Subject from {hostname}",
+		// "header": "Custom header content with {hostname} substitution."
+		// "uptime-since": true,
+		// "uptime": true,
+		// "bootid": true,
+		// "boot-wait": "systemd",
+		"delay": 5
+	},
+	"tasks": [
+		{
+			"id": "backup",
+			"type": "backup",
+			"backend": "null",
+			"backend-param": {},
+			"object-groups": [
+				{ "id": "meta-run" },
+				{
+					"id": "data-dump",
+					"depends": [ "meta-run" ]
+				},
+				{
+					"id": "tar-root",
+					"depends": [ "data-dump" ]
+				}
+			],
+			"objects": [
+				{
+					"path": "os-release",
+					"group": "meta-run",
+					"pipeline": [ { "type": "exec" , "exec-id": "os-release" } ]
+				},
+				{
+					"path": "pm-list.zstd",
+					"group": "meta-run",
+					"pipeline": [
+						{ "type": "exec", "exec-id": "rpm-list-installed" },
+						{ "type": "exec", "exec-id": "filter-zstd-plain" }
+					]
+				},
+				{
+					"path": "lsblk.json.zstd",
+					"group": "meta-run",
+					"pipeline": [
+						{ "type": "exec", "exec-id": "lsblk-all-json" },
+						{ "type": "exec", "exec-id": "filter-zstd-plain" }
+					]
+				},
+				// {
+				// 	"path": "db.sql.zstd",
+				// 	"group": "data-dump",
+				// 	"pipeline": [
+				// 		{
+				// 			"type": "exec-inline",
+				// 			"argv": [
+				// 				"/bin/mysqldump",
+				// 				"-uroot",
+				// 				"--all-databases"
+				// 			]
+				// 			// "ec": "<=2" // don't fail when the DB is offline
+				// 		},
+				// 		{ "type": "exec", "exec-id": "filter-zstd-parallel" }
+				// 	]
+				// },
+				{
+					"path": "root.tar.zstd",
+					"group": "tar-root",
+					"pipeline": [
+						{
+							"type": "exec-append",
+							"exec-id": "tar",
+							"argv": [
+								"-C",
+								"/",
+								"etc",
+								"home",
+								"root",
+								"var"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-zstd-parallel" }
+					]
+				}
+			]
+		},
+		{
+			"id": "update",
+			"type": "routine",
+			"routine": [
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/dnf", "--refresh", "-yq", "update" ]
+				}
+				// {
+				// 	"type": "exec-inline",
+				// 	"argv": [ "/bin/sa-update" ]
+				// }
+			]
+		},
+		{
+			"id": "reboot",
+			"type": "routine",
+			"routine": [
+				{
+/*
+ * Block SIGTERM from systemd/init.d so PALHM can exit gracefully after issuing
+ * reboot.
+ */
+					"type": "builtin",
+					"builtin-id": "sigmask",
+					"param": [
+						{ "action": "block", "sig": [ "TERM" ] }
+					]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/sbin/reboot" ]
+				}
+			]
+		},
+		{
+			"id": "check-dnssec",
+			"type": "backup",
+			"backend": "null",
+			"objects": [
+				{
+					"path": "example.com", // Placeholder
+					"pipeline": [
+						/*
+						 * Check if dig can query the record with the DNSSEC
+						 * validation flag. Empty stdout with zero return code
+						 * means SERVFAIL.
+						 */
+						{
+							"type": "exec-append",
+							"exec-id": "dig-dnssec",
+							"argv": [ "ANY", "example.com" ]
+						},
+						/*
+						 * Trap for empty dig output grep will return non-zero if
+						 * dig have not produced any output
+						 */
+						{ "type": "exec", "exec-id": "grep-any" }
+					]
+				}
+			]
+		},
+		{
+			"id": "default",
+			"type": "routine",
+			"routine": [
+				{ "type": "task", "task-id": "backup" },
+				{ "type": "task", "task-id": "update" },
+				{ "type": "task", "task-id": "reboot" }
+			]
+		}
+	]
+}

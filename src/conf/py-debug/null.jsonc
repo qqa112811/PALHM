@@ -1,0 +1,141 @@
+{
+	"include": [ "conf.d/core.json" ],
+	"nb-workers": 0, // assumed $(nproc)
+	// "nb-workers": 1, // to disable concurrent task despatch
+	// "nb-workers": -1, // to unlimit the number of workers.
+	"vl": 3,
+	"tasks": [
+		{
+			"id": "backup",
+			"type": "backup",
+			"backend": "null",
+			"object-groups": [
+				{ "id": "pre-start" },
+				{
+					"id": "data-dump",
+					"depends": [ "pre-start" ]
+				},
+				{
+					"id": "tar-0",
+					"depends": [ "data-dump" ]
+				},
+				{
+					"id": "tar-1",
+					"depends": [ "data-dump" ]
+				}
+			],
+			"objects": [
+				{
+					"path": "pm-list.zstd",
+					"group": "pre-start",
+					"pipeline": [
+						{ "type": "exec", "exec-id": "rpm-list-installed" },
+						{ "type": "exec", "exec-id": "filter-zstd-plain" }
+					]
+				},
+				{
+					"path": "lsblk.json.zstd",
+					"group": "pre-start",
+					"pipeline": [
+						{ "type": "exec", "exec-id": "lsblk-all-json" },
+						{ "type": "exec", "exec-id": "filter-zstd-plain" }
+					]
+				},
+				{
+					"path": "db.sql.zstd",
+					"group": "data-dump",
+					"pipeline": [
+						{
+							"type": "exec-inline",
+							"argv": [
+								"/bin/mysqldump",
+								"-uroot",
+								"--all-databases"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-zstd-parallel" }
+					]
+				},
+				{
+					"path": "root.tar.zstd",
+					"group": "tar-0",
+					"pipeline": [
+						{
+							"type": "exec-append",
+							"exec-id": "tar",
+							"argv": [
+								"-C",
+								"/",
+								"/etc",
+								"/home",
+								"/root",
+								"/var"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-zstd-parallel" }
+					]
+				},
+				{
+					"path": "srv.tar.zstd",
+					"group": "tar-1",
+					"pipeline": [
+						{
+							"type": "exec-append",
+							"exec-id": "tar",
+							"argv": [
+								"-C",
+								"/",
+								"/srv"
+							]
+						},
+						{ "type": "exec", "exec-id": "filter-zstd-parallel" }
+					]
+				}
+			]
+		},
+		{
+			"id": "update",
+			"type": "routine",
+			"routine": [
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/dnf", "--refresh", "-yq", "update" ]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/bin/sa-update" ]
+				}
+			]
+		},
+		{
+			"id": "reboot",
+			"type": "routine",
+			"routine": [
+				{
+/*
+ * Block SIGTERM from systemd/init.d so PALHM can exit gracefully after issuing
+ * reboot.
+ */
+					"type": "builtin",
+					"builtin-id": "sigmask",
+					"param": [
+						{ "action": "block", "sig": [ "TERM" ] }
+					]
+				},
+				{
+					"type": "exec-inline",
+					"argv": [ "/sbin/reboot" ]
+				}
+			]
+		},
+		{
+			"id": "default",
+			"type": "routine",
+			"routine": [
+				{ "type": "task", "task-id": "backup" },
+				{ "type": "task", "task-id": "update" },
+				{ "type": "task", "task-id": "reboot" }
+			]
+		}
+	]
+}
